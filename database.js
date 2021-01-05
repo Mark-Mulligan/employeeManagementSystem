@@ -167,7 +167,7 @@ function handleMainMenuSelect(optionSelected) {
             updateEmployeeManager();
             break;
         case 'View All Roles':
-            // code block
+            viewAllRoles();
             break;
         case 'View All Deparments':
             // code block
@@ -187,9 +187,18 @@ function getAllEmployees() {
         join departments on roles.department_id = departments.id
         left join employees b on b.id = a.manager_id or a.manager_id = null;`, function (error, results, fields) {
         if (error) throw error;
-        const table = cTable.getTable(results)
+        const table = cTable.getTable(results);
         console.log(table);
     });
+}
+
+function viewAllRoles() {
+    connection.query(`select roles.id, title, salary, departments.name as department from roles 
+    join departments where roles.department_id = departments.id;`, function (err, results) {
+        if (err) throw err;
+        const table = cTable.getTable(results);
+        console.log(table);
+    })
 }
 
 function createEmployeeQuery(firstName, lastName, roleId, managerId) {

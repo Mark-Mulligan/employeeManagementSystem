@@ -25,4 +25,3 @@ CREATE TABLE employees (
     FOREIGN KEY (role_id) REFERENCES roles(id) 
 );
 
-SELECT * FROM roles;

@@ -17,15 +17,15 @@ INSERT INTO roles (title, salary, department_id) VALUES
 ('Lawyer', 150000, 4);
 
 INSERT INTO employees (first_name, last_name, role_id, manager_id) VALUES
-('Tim', 'Jenkins', 1, null),
-('Kevin', 'James', 2, 1),
-('Stacy', 'Evans', 2, 1),
-('Steve', 'Cook', 3,  null),
-('Anna', 'Jameson', 4, 4),
-('Bart', 'Simpson', 4, 4),
-('Cathy', 'Woods', 5,  null),
-('Bill', 'Ackman', 6, 7),
-('Warren', 'Buffet', 6, 7),
-('Jessica', 'Jones', 7,  null),
-('Steve', 'Jordan', 8, 10),
-('Olaf', 'Winterfield', 8, 10);
+('Dwight', 'Schrute', 1, null),
+('Jim', 'Halpert', 2, 1),
+('Stanley', 'Hudson', 2, 1),
+('Creed', 'Bratton', 3,  null),
+('Darryl', 'Philbin', 4, 4),
+('Andy', 'Bernard', 4, 4),
+('Oscar', 'Martinez', 5,  null),
+('Angela', 'Martin', 6, 7),
+('Kevin', 'Malone', 6, 7),
+('David', 'Wallace', 7,  null),
+('Ryan', 'Howard', 8, 10),
+('Gabe', 'Lewis', 8, 10);
