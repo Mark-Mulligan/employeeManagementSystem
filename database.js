@@ -3,7 +3,6 @@ const mysql = require("mysql");
 const cTable = require('console.table');
 const inquirer = require('inquirer');
 
-
 var connection = mysql.createConnection({
     host: process.env.DB_HOST,
     port: 3306,
@@ -18,7 +17,7 @@ const mainMenuPrompt = {
     choices: ['View All Employees', 'View All Employees By Department',
         'View All Employees By Manager', 'Add Employee', 'Remove Employee',
         'Update Employee Role', 'Update Employee Manager', 'View All Roles',
-        'View All Deparments'
+        'View All Departments'
     ],
     name: 'action'
 }
@@ -169,8 +168,8 @@ function handleMainMenuSelect(optionSelected) {
         case 'View All Roles':
             viewAllRoles();
             break;
-        case 'View All Deparments':
-            // code block
+        case 'View All Departments':
+            viewAllDepartments();
             break;
         default:
             //getAllEmployees();
@@ -198,7 +197,15 @@ function viewAllRoles() {
         if (err) throw err;
         const table = cTable.getTable(results);
         console.log(table);
-    })
+    });
+}
+
+function viewAllDepartments() {
+    connection.query(`select * from departments`, function (err, results) {
+        if (err) throw err;
+        const table = cTable.getTable(results);
+        console.log(table);
+    });
 }
 
 function createEmployeeQuery(firstName, lastName, roleId, managerId) {
