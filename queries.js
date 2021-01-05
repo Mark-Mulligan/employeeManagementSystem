@@ -1,5 +1,5 @@
-// VIEW ALL EMPLOYEES
-export function getAllEmployees() {
+
+function viewAllEmployees() {
     connection.query(`Select employees.id, employees.first_name, employees.last_name, roles.title, departments.name, roles.salary, employees.manager_id 
     FROM employees join roles on employees.role_id = roles.id 
     join departments on roles.department_id = departments.id;`, function (error, results, fields) {
@@ -8,3 +8,5 @@ export function getAllEmployees() {
         console.log(table);
     });
 }
+
+exports.viewAllEmployees = viewAllEmployees();
