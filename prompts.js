@@ -40,6 +40,22 @@ module.exports = {
         }
     },
 
+    updateEmployeeRolePrompts(employeesAsArr, rolesArr) {
+        return [{
+                type: 'list',
+                message: 'Choose employee to update: ',
+                choices: employeesAsArr,
+                name: 'employee'
+            },
+            {
+                type: 'list',
+                message: 'Choose new role: ',
+                choices: rolesArr,
+                name: 'updatedRole'
+            }
+        ]
+    },
+
     createEmployeePrompts(rolesArr, employeeList) {
         return [{
                 type: 'input',

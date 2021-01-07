@@ -4,6 +4,7 @@ const cTable = require('console.table');
 const inquirer = require('inquirer');
 const util = require('./util');
 const prompts = require('./prompts');
+const scripts = require('./scripts');
 
 var connection = mysql.createConnection({
     host: process.env.DB_HOST,
@@ -13,20 +14,6 @@ var connection = mysql.createConnection({
     database: "employee_tracker_db"
 });
 
-/* ----- VIEW ONLY QUERIES ----- */
-function viewAllEmployeesScriptOrderedBy(order) {
-    return `Select a.id, a.first_name, a.last_name, roles.title, 
-departments.name as department, roles.salary, CONCAT(b.first_name, ' ', b.last_name) as manager
-    FROM employees a join roles on a.role_id = roles.id 
-    join departments on roles.department_id = departments.id
-    left join employees b on b.id = a.manager_id or a.manager_id = null
-    order by ${order};`
-}
-
-const viewAllRolesScript = `select roles.id, title, salary, departments.name as department from roles 
-join departments where roles.department_id = departments.id;`;
-
-const viewAllDepartmentsScript = `select * from departments`;
 /* ----- DATABASE CONNECTION ----- */
 connection.connect(function (err) {
     if (err) throw err;
@@ -45,16 +32,16 @@ function userMainMenu() {
 function handleMainMenuSelect(optionSelected) {
     switch (optionSelected) {
         case 'View All Employees':
-            viewAllQuery(viewAllEmployeesScriptOrderedBy('id'));
+            viewAllQuery(scripts.viewAllEmployees('id'));
             break;
         case 'View All Employees By Department':
-            viewAllQuery(viewAllEmployeesScriptOrderedBy('department'));
+            viewAllQuery(scripts.viewAllEmployees('department'));
             break;
         case 'View All Employees By Manager':
-            viewAllQuery(viewAllEmployeesScriptOrderedBy('manager'));
+            viewAllQuery(scripts.viewAllEmployees('manager'));
             break;
         case 'View All Employees Alphabetically':
-            viewAllQuery(viewAllEmployeesScriptOrderedBy('last_name'));
+            viewAllQuery(scripts.viewAllEmployees('last_name'));
             break;
         case 'Add Employee':
             createEmployee();
@@ -69,13 +56,13 @@ function handleMainMenuSelect(optionSelected) {
             updateEmployeeManager();
             break;
         case 'View All Roles':
-            viewAllQuery(viewAllRolesScript);
+            viewAllQuery(scripts.viewAllRoles);
             break;
         case 'Add New Role':
             createRole();
             break;
         case 'View All Departments':
-            viewAllQuery(viewAllDepartmentsScript);
+            viewAllQuery(scripts.viewAllDepartments);
             break;
         case 'Add New Department':
             createDepartment();
@@ -142,19 +129,7 @@ function updateEmployeeRole() {
             if (err) throw err;
             let rolesArr = util.createArrayFromSqlData(allRoles, 'title');
 
-            inquirer.prompt([{
-                    type: 'list',
-                    message: 'Choose employee to update: ',
-                    choices: employeesAsArr,
-                    name: 'employee'
-                },
-                {
-                    type: 'list',
-                    message: 'Choose new role: ',
-                    choices: rolesArr,
-                    name: 'updatedRole'
-                }
-            ]).then(res => {
+            inquirer.prompt(prompts.updateEmployeeRolePrompts(employeesAsArr, rolesArr)).then(res => {
                 let selectedEmployee = util.createNameObj(res.employee);
                 let employeeId = util.getIdOfEmployee(allEmployees, selectedEmployee.firstName, selectedEmployee.lastName);
                 let roleId = util.getIdOfSqlTarget(allRoles, 'title', res.updatedRole);
