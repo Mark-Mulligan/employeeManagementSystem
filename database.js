@@ -3,6 +3,7 @@ const mysql = require("mysql");
 const cTable = require('console.table');
 const inquirer = require('inquirer');
 const util = require('./util');
+const prompts = require('./prompts');
 
 var connection = mysql.createConnection({
     host: process.env.DB_HOST,
@@ -11,24 +12,6 @@ var connection = mysql.createConnection({
     password: process.env.DB_PASS,
     database: "employee_tracker_db"
 });
-
-/* ----- STATIC INQUIRER PROMPTS ----- */
-const mainMenuPrompt = {
-    type: 'list',
-    message: 'What would you like to do: ',
-    choices: ['View All Employees', 'View All Employees Alphabetically', 'View All Employees By Department',
-        'View All Employees By Manager', 'Add Employee', 'Remove Employee',
-        'Update Employee Role', 'Update Employee Manager', 'View All Roles',
-        'Add New Role', 'View All Departments', 'Add New Department'
-    ],
-    name: 'action'
-}
-
-const createDepartmentPropmt = {
-    type: 'input',
-    message: 'Enter the name of the new department: ',
-    name: 'name'
-};
 
 /* ----- VIEW ONLY QUERIES ----- */
 function viewAllEmployeesScriptOrderedBy(order) {
@@ -53,7 +36,8 @@ connection.connect(function (err) {
 
 /* ----- MAIN PROGRAM LOGIC ----- */
 function userMainMenu() {
-    inquirer.prompt(mainMenuPrompt).then(res => {
+    inquirer.prompt(prompts.mainMenuPrompt).then(res => {
+        console.log(res.action);
         handleMainMenuSelect(res.action);
     })
 }
@@ -66,7 +50,7 @@ function handleMainMenuSelect(optionSelected) {
         case 'View All Employees By Department':
             viewAllQuery(viewAllEmployeesScriptOrderedBy('department'));
             break;
-        case 'View All Employees By Manger':
+        case 'View All Employees By Manager':
             viewAllQuery(viewAllEmployeesScriptOrderedBy('manager'));
             break;
         case 'View All Employees Alphabetically':
@@ -103,11 +87,7 @@ function handleMainMenuSelect(optionSelected) {
 
 //Had to put this inside each query function because of async activity with database.
 function continueProgram() {
-    inquirer.prompt({
-        type: 'confirm',
-        message: 'Would you like to do something else? ',
-        name: 'continue'
-    }).then(res => {
+    inquirer.prompt(prompts.continueProgramPrompt).then(res => {
         if (res.continue) userMainMenu();
         else connection.end();
     })
@@ -117,41 +97,23 @@ function continueProgram() {
 function createEmployee() {
     connection.query(`select id, first_name, last_name from employees;`, function (err, allEmployees) {
         if (err) throw err;
-        let employeeList = turnNameColsToArray(allEmployees);
+        let employeeList = util.createArrOfNames(allEmployees);
         employeeList.push('No Manager');
 
         connection.query(`SELECT id, title FROM roles;`, function (error, allRoles) {
             if (error) throw error;
             let rolesArr = util.createArrayFromSqlData(allRoles, 'title');
 
-            inquirer.prompt([{
-                    type: 'input',
-                    message: `Enter employee's first name: `,
-                    name: 'firstName'
-                },
-                {
-                    type: 'input',
-                    message: `Enter employee's last name: `,
-                    name: 'lastName'
-                },
-                {
-                    type: 'list',
-                    message: `Choose employee's role: `,
-                    choices: rolesArr,
-                    name: 'role'
-                },
-                {
-                    type: 'list',
-                    message: `Choose employee's manager`,
-                    choices: employeeList,
-                    name: 'manager'
-                }
-            ]).then(res => {
+            inquirer.prompt(prompts.createEmployeePrompts(rolesArr, employeeList)).then(res => {
                 let roleId = util.getIdOfSqlTarget(allRoles, 'title', res.role);
-                if (res.manager === 'No Manager') createEmployeeQuery(res.firstName, res.lastName, roleId, null);
+
+                if (res.manager === 'No Manager') {
+                    createEmployeeQuery(res.firstName, res.lastName, roleId, null);
+                }
                 else {
-                    let manager = separateIdFirstLastName(res.manager);
-                    createEmployeeQuery(res.firstName, res.lastName, roleId, manager.id);
+                    let manager = util.createNameObj(res.manager);
+                    let managerId = util.getIdOfEmployee(allEmployees, manager.firstName, manager.lastName);
+                    createEmployeeQuery(res.firstName, res.lastName, roleId, managerId);
                 }
             })
         });
@@ -159,26 +121,22 @@ function createEmployee() {
 }
 
 function deleteEmployee() {
-    connection.query(`Select id, first_name, last_name FROM employees;`, function (error, results) {
+    connection.query(`Select id, first_name, last_name FROM employees;`, function (error, allEmployees) {
         if (error) throw error;
-        let employeesAsArr = turnNameColsToArray(results);
+        let employeesAsArr = util.createArrOfNames(allEmployees);
 
-        inquirer.prompt({
-            type: 'list',
-            message: 'Choose employee to remove: ',
-            choices: employeesAsArr,
-            name: 'employee'
-        }).then(res => {
-            let selection = separateIdFirstLastName(res.employee);
-            deleteEmployeeQuery(selection);
+        inquirer.prompt(prompts.deleteEmployeePrompt(employeesAsArr)).then(res => {
+            let selectedEmployee = util.createNameObj(res.employee);
+            let employeeId = util.getIdOfEmployee(allEmployees, selectedEmployee.firstName, selectedEmployee.lastName);
+            deleteEmployeeQuery(employeeId, selectedEmployee);
         })
     })
 }
 
 function updateEmployeeRole() {
-    connection.query(`Select id, first_name, last_name FROM employees;`, function (error, results) {
+    connection.query(`Select id, first_name, last_name FROM employees;`, function (error, allEmployees) {
         if (error) throw error;
-        let employeesAsArr = turnNameColsToArray(results);
+        let employeesAsArr = util.createArrOfNames(allEmployees);
 
         connection.query(`SELECT id, title FROM roles;`, function (err, allRoles) {
             if (err) throw err;
@@ -197,38 +155,32 @@ function updateEmployeeRole() {
                     name: 'updatedRole'
                 }
             ]).then(res => {
-                let employeeId = separateIdFirstLastName(res.employee);
+                let selectedEmployee = util.createNameObj(res.employee);
+                let employeeId = util.getIdOfEmployee(allEmployees, selectedEmployee.firstName, selectedEmployee.lastName);
                 let roleId = util.getIdOfSqlTarget(allRoles, 'title', res.updatedRole);
-                updateEmployeeRoleQuery(employeeId, res.updatedRole, roleId);
+                updateEmployeeRoleQuery(employeeId, selectedEmployee, res.updatedRole, roleId);
             })
         })
     })
 }
 
 function updateEmployeeManager() {
-    connection.query(`Select id, first_name, last_name FROM employees;`, function (error, results) {
+    connection.query(`Select id, first_name, last_name FROM employees;`, function (error, employees) {
         if (error) throw error;
-        let employeesAsArr = turnNameColsToArray(results);
+        let employeesAsArr = util.createArrOfNames(employees);
 
-        inquirer.prompt({
-            type: 'list',
-            message: 'Choose employee to update: ',
-            choices: employeesAsArr,
-            name: 'employee'
-        }).then(res => {
-            let selectedEmployee = separateIdFirstLastName(res.employee);
-            connection.query(`Select id, first_name, last_name FROM employees WHERE id != ${selectedEmployee.id};`, function (err, results) {
+        inquirer.prompt(prompts.updateEmployeeManagerPrompt1(employeesAsArr)).then(res => {
+            let selectedEmployee = util.createNameObj(res.employee);
+            let employeeId = util.getIdOfEmployee(employees, selectedEmployee.firstName, selectedEmployee.lastName);
+
+            connection.query(`Select id, first_name, last_name FROM employees WHERE id != ${employeeId};`, function (err, possibleManagers) {
                 if (err) throw err;
-                let managersAsArr = turnNameColsToArray(results);
+                let managersAsArr = util.createArrOfNames(possibleManagers);
 
-                inquirer.prompt({
-                    type: 'list',
-                    message: 'Choose manger for employee: ',
-                    choices: managersAsArr,
-                    name: 'manager'
-                }).then(res => {
-                    let selectedManager = separateIdFirstLastName(res.manager);
-                    updateEmployeManagerQuery(selectedEmployee, selectedManager);
+                inquirer.prompt(prompts.updateEmployeeManagerPrompt2(managersAsArr)).then(res => {
+                    let selectedManager = util.createNameObj(res.manager);
+                    let managerId = util.getIdOfEmployee(possibleManagers, selectedManager.firstName, selectedManager.lastName);
+                    updateEmployeManagerQuery(selectedEmployee, selectedManager, employeeId, managerId);
                 })
             })
         });
@@ -240,23 +192,7 @@ function createRole() {
         if (err) throw err;
         let departments = util.createArrayFromSqlData(departmentResults, 'name');
 
-        inquirer.prompt([{
-                type: 'input',
-                message: 'Enter the name of the role: ',
-                name: 'roleName'
-            },
-            {
-                type: 'number',
-                message: 'Enter the salary for this position (numbers only): ',
-                name: 'salary'
-            },
-            {
-                type: 'list',
-                message: 'Choose the department that the role belong to: ',
-                choices: departments,
-                name: 'department'
-            }
-        ]).then(res => {
+        inquirer.prompt(prompts.createRolesPrompt(departments)).then(res => {
             let departmentId = util.getIdOfSqlTarget(departmentResults, 'name', res.department);
             createRoleQuery(res.roleName, res.salary, departmentId);
         })
@@ -264,7 +200,7 @@ function createRole() {
 }
 
 function createDepartment() {
-    inquirer.prompt(createDepartmentPropmt).then(res => {
+    inquirer.prompt(prompts.createDepartmentPrompt).then(res => {
         createDepartmentQuery(res.name);
     })
 }
@@ -307,8 +243,8 @@ function createRoleQuery(title, salary, department_id) {
     })
 }
 
-function deleteEmployeeQuery(nameObj) {
-    connection.query(`DELETE FROM employees WHERE id = ?`, [nameObj.id], function (err, results) {
+function deleteEmployeeQuery(employeeId, nameObj) {
+    connection.query(`DELETE FROM employees WHERE id = ?`, [employeeId], function (err, results) {
         if (err) throw err;
         console.log(`${nameObj.firstName} ${nameObj.lastName} removed from employees.`);
         continueProgram();
@@ -316,45 +252,18 @@ function deleteEmployeeQuery(nameObj) {
 
 }
 
-function updateEmployeeRoleQuery(nameObj, newRoleTitle, newRoleId) {
-    connection.query(`UPDATE employees SET role_id = ? WHERE id = ?`, [newRoleId, nameObj.id], function (error, results) {
+function updateEmployeeRoleQuery(employeeId, nameObj, newRoleTitle, newRoleId) {
+    connection.query(`UPDATE employees SET role_id = ? WHERE id = ?`, [newRoleId, employeeId], function (error, results) {
         if (error) throw error;
         console.log(`${nameObj.firstName} ${nameObj.lastName}'s role was updated to ${newRoleTitle}`);
         continueProgram();
     })
 }
 
-function updateEmployeManagerQuery(employeeObj, newManagerObj) {
-    connection.query(`UPDATE employees SET manager_id = ${newManagerObj.id} Where id = ${employeeObj.id};`, function (error, results) {
+function updateEmployeManagerQuery(employeeNameObj, managerNameObj, employeeId, managerId) {
+    connection.query(`UPDATE employees SET manager_id = ? Where id = ?`, [managerId, employeeId], function (error, results) {
         if (error) throw error;
-        console.log(`${employeeObj.firstName} ${employeeObj.lastName}'s manager was updated to ${newManagerObj.firstName} ${newManagerObj.lastName}`);
+        console.log(`${employeeNameObj.firstName} ${employeeNameObj.lastName}'s manager was updated to ${managerNameObj.firstName} ${managerNameObj.lastName}`);
         continueProgram();
     })
-}
-
-/* ---- OTHER FUNCTIONS ----- */
-function turnNameColsToArray(input) {
-    let tempResult = '';
-    let formattedResult = [];
-
-    for (let i = 0; i < input.length; i++) {
-        tempResult = `id:${input[i].id} ${input[i].first_name} ${input[i].last_name}`;
-        formattedResult.push(tempResult);
-    }
-    return formattedResult;
-}
-
-function separateIdFirstLastName(name) {
-    let nameArr = name.split(' ');
-    return {
-        id: getNumFromIdString(nameArr[0]),
-        firstName: nameArr[1],
-        lastName: nameArr[2]
-    };
-}
-
-function getNumFromIdString(input) {
-    let findNums = /[0-9]+/;
-    let result = input.match(findNums);
-    return Number(result);
 }
